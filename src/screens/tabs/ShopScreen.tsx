@@ -3,22 +3,26 @@
 // Analytics dashboard + curated upgrade suggestions
 // ─────────────────────────────────────────────────────────────────────────────
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Dimensions,
-  StatusBar,
+  StatusBar, Pressable,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import { useClosetStore } from '../../stores/closetStore';
 import { useOutfitStore } from '../../stores/outfitStore';
+import { useUserStore } from '../../stores/userStore';
 import { Brand, Dark, AuraSpectrum } from '../../theme/colors';
 import { FontFamily } from '../../theme/typography';
 import { BorderRadius, Shadows, Spacing } from '../../theme/spacing';
 import { GlassCard } from '../../components/GlassCard';
 import { SpectrumBar, SpectrumOrb } from '../../components/SpectrumBar';
 import { AnimatedButton } from '../../components/AnimatedButton';
+import { ShareModal } from '../../components/ShareModal';
+import { ClosetStatsShareCard, useClosetStatsCapture } from '../../components/ClosetStatsShareCard';
 
 const { width: SW } = Dimensions.get('window');
 const BAR_MAX_W = SW - 120;
@@ -27,6 +31,10 @@ export function ShopScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const { garments, getClosetStats } = useClosetStore();
   const { outfits } = useOutfitStore();
+  const profile = useUserStore((s) => s.profile);
+
+  const [showShareModal, setShowShareModal] = useState(false);
+  const { cardRef: statsCardRef, capture: captureStatsCard } = useClosetStatsCapture();
 
   const stats = useMemo(() => getClosetStats(), [garments]);
 
@@ -61,10 +69,30 @@ export function ShopScreen({ navigation }: any) {
         {/* Header */}
         <Animated.View entering={FadeInDown.duration(600)} style={styles.header}>
           <SpectrumBar height={2} style={{ width: 40, marginBottom: Spacing.md }} />
-          <Text style={styles.title}>Wardrobe Stats</Text>
-          <Text style={styles.subtitle}>
-            Your closet, quantified. Make every item earn its place.
-          </Text>
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={styles.title}>Wardrobe Stats</Text>
+              <Text style={styles.subtitle}>
+                Your closet, quantified. Make every item earn its place.
+              </Text>
+            </View>
+            {stats.totalItems > 0 && (
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setShowShareModal(true);
+                }}
+                style={styles.shareStatsBtn}
+              >
+                <LinearGradient
+                  colors={[Brand.violet, Brand.pink]}
+                  style={styles.shareStatsBtnGrad}
+                >
+                  <Text style={styles.shareStatsBtnText}>↑ Share</Text>
+                </LinearGradient>
+              </Pressable>
+            )}
+          </View>
         </Animated.View>
 
         {/* Hero stats */}
@@ -210,6 +238,24 @@ export function ShopScreen({ navigation }: any) {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Hidden stats card + share modal */}
+      {stats.totalItems > 0 && (
+        <ClosetStatsShareCard
+          ref={statsCardRef}
+          stats={stats}
+          outfitCount={outfits.length}
+          topSeason={profile?.colorSeason}
+          visible={false}
+        />
+      )}
+      <ShareModal
+        visible={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        contentType="closet-stats"
+        seasonName={profile?.colorSeason}
+        onRequestCapture={captureStatsCard}
+      />
     </View>
   );
 }
@@ -282,6 +328,12 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#060B14' },
   scroll: { paddingBottom: 40 },
   header: { paddingHorizontal: Spacing['2xl'], marginBottom: Spacing['2xl'] },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+  },
   title: {
     fontFamily: FontFamily.serifBold,
     fontSize: 38,
@@ -295,6 +347,23 @@ const styles = StyleSheet.create({
     color: Dark.textSecondary,
     marginTop: 4,
     lineHeight: 22,
+    maxWidth: '80%',
+  },
+  shareStatsBtn: {
+    borderRadius: BorderRadius.full,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  shareStatsBtnGrad: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+  },
+  shareStatsBtnText: {
+    fontFamily: FontFamily.sansSemiBold,
+    fontSize: 12,
+    color: '#fff',
+    letterSpacing: 0.5,
   },
   heroStats: {
     flexDirection: 'row',

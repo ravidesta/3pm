@@ -24,6 +24,8 @@ import { AnimatedButton } from '../../components/AnimatedButton';
 import { SpectrumBar, SpectrumOrb } from '../../components/SpectrumBar';
 import { GlassCard } from '../../components/GlassCard';
 import { analyzeSkinTone } from '../../services/gptVision';
+import { ShareModal } from '../../components/ShareModal';
+import { ColorSeasonShareCard, useColorSeasonCapture } from '../../components/ColorSeasonShareCard';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -37,6 +39,8 @@ export function ColorCheckScreen({ navigation }: any) {
   const [undertone, setUndertone] = useState<'warm' | 'cool' | 'neutral' | null>(null);
   const [subSeason, setSubSeason] = useState<string>('');
   const [rationale, setRationale] = useState<string>('');
+  const [showShareModal, setShowShareModal] = useState(false);
+  const { cardRef: seasonCardRef, capture: captureSeasonCard } = useColorSeasonCapture();
 
   const progressVal = useSharedValue(0);
   const progressStyle = useAnimatedStyle(() => ({ width: `${progressVal.value * 100}%` }));
@@ -245,12 +249,51 @@ export function ColorCheckScreen({ navigation }: any) {
               </View>
             </View>
 
+            {/* Share your season — viral CTA */}
+            <Pressable
+              onPress={() => setShowShareModal(true)}
+              style={styles.shareSeasonBtn}
+            >
+              <LinearGradient
+                colors={['rgba(124,58,237,0.2)', 'rgba(236,72,153,0.15)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.shareSeasonGrad}
+              >
+                <Text style={styles.shareSeasonEmoji}>✦</Text>
+                <View>
+                  <Text style={styles.shareSeasonTitle}>Share your color season</Text>
+                  <Text style={styles.shareSeasonSub}>Instagram · TikTok · Pinterest</Text>
+                </View>
+                <Text style={styles.shareSeasonArrow}>↑</Text>
+              </LinearGradient>
+            </Pressable>
+
             <AnimatedButton
               label="This is me ✦"
               onPress={handleNext}
               size="lg"
               fullWidth
               hapticStyle={Haptics.ImpactFeedbackStyle.Medium}
+            />
+
+            {/* Hidden share card */}
+            {season && (
+              <ColorSeasonShareCard
+                ref={seasonCardRef}
+                season={season}
+                subSeason={subSeason}
+                visible={false}
+              />
+            )}
+
+            {/* Share modal */}
+            <ShareModal
+              visible={showShareModal}
+              onClose={() => setShowShareModal(false)}
+              contentType="color-season"
+              seasonName={season ?? undefined}
+              onRequestCapture={async () => captureSeasonCard()}
             />
           </Animated.View>
         )}
@@ -444,5 +487,35 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.15)',
     ...Shadows.sm,
+  },
+  shareSeasonBtn: {
+    borderRadius: BorderRadius.xl,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(124,58,237,0.3)',
+  },
+  shareSeasonGrad: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    gap: Spacing.md,
+  },
+  shareSeasonEmoji: { fontSize: 24 },
+  shareSeasonTitle: {
+    fontFamily: FontFamily.serifSemiBold,
+    fontSize: 15,
+    color: Dark.textPrimary,
+    lineHeight: 19,
+  },
+  shareSeasonSub: {
+    fontFamily: FontFamily.sansMedium,
+    fontSize: 10,
+    color: Dark.textTertiary,
+    letterSpacing: 0.3,
+  },
+  shareSeasonArrow: {
+    marginLeft: 'auto',
+    fontSize: 18,
+    color: Brand.violetLight,
   },
 });

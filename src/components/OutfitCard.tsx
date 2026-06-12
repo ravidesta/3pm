@@ -3,14 +3,14 @@
 // The hero component: beautiful outfit flat-lay card with score, share button
 // ─────────────────────────────────────────────────────────────────────────────
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, Pressable, Image, Dimensions,
-  ViewStyle, Share,
+  ViewStyle,
 } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSpring, withTiming,
-  FadeIn, SlideInDown,
+  FadeIn,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -21,6 +21,9 @@ import { BorderRadius, Shadows, Spacing } from '../theme/spacing';
 import { Springs } from '../theme/animations';
 import { GlassCard } from './GlassCard';
 import { SpectrumBar } from './SpectrumBar';
+import { ShareModal } from './ShareModal';
+import { OutfitShareCard, useOutfitCardCapture } from './OutfitShareCard';
+import { useUserStore } from '../stores/userStore';
 
 const { width: SW } = Dimensions.get('window');
 const CARD_W = SW - 40;
@@ -43,6 +46,10 @@ export const OutfitCard: React.FC<OutfitCardProps> = ({
 }) => {
   const scale = useSharedValue(1);
   const [liked, setLiked] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const { cardRef, capture, isCapturing } = useOutfitCardCapture();
+  const [shareFormat, setShareFormat] = useState<'feed' | 'stories'>('stories');
+  const profile = useUserStore((s) => s.profile);
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -58,12 +65,11 @@ export const OutfitCard: React.FC<OutfitCardProps> = ({
 
   const handleShare = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try {
-      await Share.share({
-        message: `I built this outfit with Aura Closet — "${outfit.styleNarrative}" 💜\n${outfit.deepLink}`,
-      });
-      onShare?.(outfit);
-    } catch (_) {}
+    setShowShareModal(true);
+  }, []);
+
+  const handleShareComplete = useCallback((platform: string) => {
+    onShare?.(outfit);
   }, [outfit, onShare]);
 
   const handleRemix = useCallback(() => {
@@ -198,7 +204,7 @@ export const OutfitCard: React.FC<OutfitCardProps> = ({
             <View style={styles.actions}>
               <ActionButton icon="✦" label="Wear" onPress={handleWear} primary />
               <ActionButton icon="⟳" label="Remix" onPress={handleRemix} />
-              <ActionButton icon="↑" label="Share" onPress={handleShare} />
+              <ActionButton icon={isCapturing ? '…' : '↑'} label="Share" onPress={handleShare} />
               <ActionButton
                 icon={liked ? '♥' : '♡'}
                 label="Save"
@@ -212,6 +218,32 @@ export const OutfitCard: React.FC<OutfitCardProps> = ({
           </View>
         </View>
       </AnimatedPressable>
+
+      {/* Hidden share card (off-screen, captured by ViewShot) */}
+      <OutfitShareCard
+        ref={cardRef}
+        outfit={outfit}
+        format={shareFormat}
+        colorSeason={profile?.colorSeason}
+        visible={false}
+      />
+
+      {/* Share modal */}
+      <ShareModal
+        visible={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        contentType="outfit"
+        contentId={outfit.id}
+        onRequestCapture={async (fmt) => {
+          setShareFormat(fmt);
+          // Small delay to allow format state update + re-render
+          await new Promise((r) => setTimeout(r, 80));
+          return capture();
+        }}
+        onShareComplete={handleShareComplete}
+        scoreValue={outfit.matchScore}
+        seasonName={profile?.colorSeason}
+      />
     </Animated.View>
   );
 };
